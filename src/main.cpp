@@ -202,7 +202,7 @@ static void simulateSand(Grid* grid) {
 
             bool is_room_bellow = false;
             if (isInRangeVec2(bellow_pos)) {
-                if (grid->cellHasMaterialVec2(bellow_pos)) {
+                if (!grid->cellHasMaterialVec2(bellow_pos)) {
                     is_room_bellow = true;
                 }
             }
