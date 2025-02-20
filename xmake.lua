@@ -6,5 +6,5 @@ target("main")
     add_packages("raylib")
     set_languages("c11", "c++23")
     add_cxxflags("-g")
-    -- set_optimize("fastest")
+    set_optimize("fastest")
     

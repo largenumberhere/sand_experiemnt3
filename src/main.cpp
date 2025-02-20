@@ -4,8 +4,8 @@
 #include <vector>
 #include <optional>
 
-const int WIDTH = 768;
-const int HEIGHT = 448; 
+const int WIDTH = 1024;
+const int HEIGHT = 768; 
 const int COLUMNS_X = WIDTH;
 const int ROWS_Y = HEIGHT;
 
@@ -216,16 +216,19 @@ static void simulateSand(Grid* grid) {
                 
             }
 
-
-            
-
         }
     }
-
-    //
 }
 
-static void updateTexture(RenderTexture2D* texture, std::vector<int>* backing, Grid* grid) {
+static Texture2D genTexture2d() {
+    auto image = GenImageColor(WIDTH, HEIGHT,RED);
+    auto texture = LoadTextureFromImage(image);
+    UnloadImage(image);
+
+    return texture;
+}
+
+static void updateTexture(Texture2D* texture, std::vector<int>* backing, Grid* grid) {
     for (int x = 0; x < COLUMNS_X; x++) {
         for (int y = 0; y < ROWS_Y; y++) {
             int& backing_ref = (*backing).at((y * COLUMNS_X) + x);
@@ -240,7 +243,7 @@ static void updateTexture(RenderTexture2D* texture, std::vector<int>* backing, G
         } 
     }
 
-    UpdateTexture(texture->texture, backing->data());
+    UpdateTexture(*texture, backing->data());
 }
 
 
@@ -270,22 +273,16 @@ static Vector2 clampGridPos(Vector2 pos) {
     return pos;
 }
 
+
+
 int main() {
 
     InitWindow(WIDTH, HEIGHT, "sand experiment 3");
     double time = GetTime();
-    RenderTexture2D texture = LoadRenderTexture(COLUMNS_X, ROWS_Y);
-    std::vector<int> texture_backing = std::vector<int>();
+    auto texture = genTexture2d();
+    std::vector<int> texture_backing = std::vector<int>(COLUMNS_X * ROWS_Y);
     
-    for (int64_t i = 0; i < COLUMNS_X * ROWS_Y; i++) {
-        texture_backing.push_back(0);
-    }
     Grid grid = Grid();
-    // for (int64_t y = 0; y < ROWS_Y; y++) {
-    //     for (int64_t x = 0; x < COLUMNS_X; x++) {
-    //         grid.setCellMaterial(x,y);
-    //     }
-    // }
 
     while (!WindowShouldClose())
     {
@@ -301,12 +298,19 @@ int main() {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 position = GetMousePosition();
             
-            Vector2 positionMax = position;
-            positionMax.x += 25.0;
-            positionMax.y += 25.0;
 
+            Vector2 positionMax = position;
+            positionMax.x += 12.5;
+            positionMax.y += 12.5;
             positionMax = clampGridPos(mouseToGrid(positionMax));
-            Vector2 positionMin = clampGridPos(mouseToGrid(position));
+            
+
+
+            Vector2 positionMin = position;
+            positionMin.x -=12.5;
+            positionMin.y -=12.5;
+            positionMin = clampGridPos(mouseToGrid(positionMin));
+            
 
             for (double x = positionMin.x; x < positionMax.x; x++) {
                 for (double y = positionMin.y; y < positionMax.y; y++) {
@@ -321,10 +325,12 @@ int main() {
             ClearBackground(BLACK);
             DrawFPS(10, 10);
 
-            DrawTexture(texture.texture , 0, 0, RED);
+            DrawTexture(texture , 0, 0, RED);
             
         }
         EndDrawing();
     }
     
+    UnloadTexture(texture);
+
 }
