@@ -9,6 +9,8 @@ const int HEIGHT = 768;
 const int COLUMNS_X = WIDTH;
 const int ROWS_Y = HEIGHT;
 
+const int BOUNDS_ASSERTIONS = true;
+
 static void todoImpl(uint64_t line, const char* file) {
     std::cerr << file << ":" << line << " is todo" << std::endl;
     exit(1);
@@ -20,93 +22,119 @@ static void todoImpl(uint64_t line, const char* file) {
 
 
 
-static void setBit(uint8_t* val, int n, bool state) {
-    *val ^= *val & (1 << n);
-    *val |= state << n;
-}
+// static void setBit(uint8_t* val, int n, bool state) {
+//     *val ^= *val & (1 << n);
+//     *val |= state << n;
+// }
 
-static bool getBit(uint8_t value, int index) {
-    return (value >> index) & 1;
-}
+// static bool getBit(uint8_t value, int index) {
+//     return (value >> index) & 1;
+// }
 
 
-static bool isInRange(uint64_t x, uint64_t y) {
-    if (y >= ROWS_Y || x >= COLUMNS_X || y < 0 || x < 0) {
-        return false;
-    }
 
-    return true;
-}
-
-static bool isInRangeVec2(Vector2 vec) {
-    return isInRange(vec.x, vec.y);
-}
 
 
 
 class Grid {
-
+    
 
     private:
+        /*
+            Each cell is encoded in as bits. Each bit has a specific purpose
+            | Offset    | Description                               | Name          |
+            |-----------|-------------------------------------------|---------------|
+            | 0         | true if the cell has a sand-like material | _SAND_FLAG    |
+            | 1         | temporary boolean for use in simulation   | _MOVED_FLAG   |
+        */
+        typedef uint64_t Cell;
    
         static const int _LEN =  (COLUMNS_X * ROWS_Y);
-        static const int _MATERIAL_FLAG = (0);
+        static const int _SAND_FLAG = (0);
         static const int _MOVED_FLAG = (1);
-        /*
-            Each cell is encoded in uin8_t, this has 8 bits. Each bit has a specific purpose
-            | offset    | description                               | name          |
-            |-----------|-------------------------------------------|---------------|
-            | 0         | true if the cell has a sand-like material | material      |
-            | 1         | temporary boolean for use in simulation   | moved flag    |
-        */
 
 
-        std::vector<uint8_t> _cells = std::vector<uint8_t>();
+        std::vector<Cell> _cells = std::vector<Cell>();
+        static const int _CELL_SIZE = sizeof(_cells[0]);
+
         
-        bool rangeCheck(uint64_t x, uint64_t y) {
-            if (!isInRange(x,y)) {
-                std::cerr << "x: " << x << ", y: " << y << "";    
-                return false;
+        inline static void setCellBit(uint64_t* val, int n, bool state) {
+            *val ^= *val & (1 << n);
+            *val |= state << n;
+        }
+
+        inline static bool getCellBit(uint64_t value, int n) {
+            return (value >> n) & 1;
+        }
+
+        inline static bool rangeCheck(uint64_t x, uint64_t y) {
+            if (BOUNDS_ASSERTIONS) {
+                if (!isInRange(x,y)) {
+                    std::cerr << "x: " << x << ", y: " << y << "\n";    
+                    return false;
+                }
             }
 
             return true;
         }
 
-        uint8_t* getCell(uint64_t x, uint64_t y) {
+        inline Cell* getCell(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
 
             uint64_t pos = (y * COLUMNS_X) + x;
-            uint8_t& item = _cells.at(pos);
-            return (uint8_t*) &item;
+            
+            Cell* item_ptr = NULL;
+            if (BOUNDS_ASSERTIONS) {
+                auto& item = _cells.at(pos);
+                item_ptr = (Cell*)&item;
+            } else {
+                auto& item = _cells[pos];
+                item_ptr = (Cell*)&item;
+            }
+            return item_ptr;
         }
         
     public:
-        Grid() {
+        inline Grid() {
             for (int i = 0; i < WIDTH * HEIGHT; i++) {
                 _cells.push_back(0);
             }
         }
 
-        bool cellHasMaterial(uint64_t x, uint64_t y){
+        // bounds checks
+        inline static bool isInRange(uint64_t x, uint64_t y) {
+            if (y >= ROWS_Y || x >= COLUMNS_X || y < 0 || x < 0) {
+                return false;
+            }
+        
+            return true;
+        }
+        
+        inline static bool isInRangeVec2(Vector2 vec) {
+            return isInRange(vec.x, vec.y);
+        }
+
+        // if the cell is a sand-like material
+        inline bool cellHasSand(uint64_t x, uint64_t y){
             if (!rangeCheck(x,y)) {
                 TODO();
             }
             auto * cell = getCell(x,y);
-            bool material_flag = getBit(*cell, _MATERIAL_FLAG);
+            bool material_flag = getCellBit(*cell, _SAND_FLAG);
             
             return material_flag == 1;
         }
 
-        bool cellHasMaterialVec2(Vector2 pos) {
+        inline bool cellHasSandVec2(Vector2 pos) {
             if (!rangeCheck(pos.x,pos.y)) {
                 TODO();
             }
-            return cellHasMaterial(pos.x, pos.y);
+            return cellHasSand(pos.x, pos.y);
         }
 
-        void moveCellVec2(Vector2 from, Vector2 to) {
+        inline void moveCellVec2(Vector2 from, Vector2 to) {
             if (!rangeCheck(from.x,from.y)) {
                 TODO();
             }
@@ -115,8 +143,8 @@ class Grid {
                 TODO();
             }
 
-            auto from_cell =  getCell(from.x, from.y);
-            auto to_cell = getCell(to.x, to.y);
+            Cell* from_cell =  getCell(from.x, from.y);
+            Cell* to_cell = getCell(to.x, to.y);
             
             auto from_copy = *from_cell;
             *from_cell = 0;
@@ -125,49 +153,56 @@ class Grid {
             setCellMoved(to.x, to.y);
         }
 
-        
-        void setCellMaterial(uint64_t x, uint64_t y){
+        // set the sand bit to true
+        inline void setCellSand(uint64_t x, uint64_t y){
             if (!rangeCheck(x,y)) {
                 TODO();
             }
-            uint8_t* cell = getCell(x,y);
-            setBit(cell, _MATERIAL_FLAG, true);
+            Cell* cell = getCell(x,y);
+            setCellBit(cell, _SAND_FLAG, true);
         }
 
-        void resetCell(uint64_t x, uint64_t y) {
+        inline void resetCell(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
-            uint8_t* cell = getCell(x,y);
-            *cell = 0x00;
+            Cell* cell = getCell(x,y);
+            *cell = 0;
         }
 
-        void setCellMoved(uint64_t x, uint64_t y) {
+        inline void setCellMoved(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
-            uint8_t* cell = getCell(x,y);
-            setBit(cell, _MOVED_FLAG, true);
+            Cell* cell = getCell(x,y);
+            setCellBit(cell, _MOVED_FLAG, true);
         }
 
-        void setCellsNotMoved() {
+        // only call once per loop
+        inline void setCellsNotMoved() {
             for (uint64_t y = 0; y < ROWS_Y; y++) {
-                for (uint64_t x = 0; x < COLUMNS_X; x++) {
-                    if (!rangeCheck(x,y)) {
+                for (uint64_t x = 0; x < COLUMNS_X; x+=8) {
+                    if (!rangeCheck(x,y) || !(rangeCheck(x+7, y))) {
                         TODO();
                     }
-                    auto* cell = getCell(x,y);
-                    setBit(cell, _MOVED_FLAG, false);
+
+                    
+                    Cell* eight_cells = getCell(x,y);
+
+                    for (uint64_t i = 0; i < 8; i++) {
+                        setCellBit(eight_cells + i, _MOVED_FLAG, false);
+                    }
+    
                 }
             }
         }
 
-        bool isCellMoved(uint64_t x, uint64_t y) {
+        inline bool isCellMoved(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
-            uint8_t*cell =getCell(x,y);
-            bool moved = getBit(*cell, _MOVED_FLAG);
+            Cell*cell =getCell(x,y);
+            bool moved = getCellBit(*cell, _MOVED_FLAG);
             
             return moved;
         }
@@ -183,7 +218,7 @@ static void simulateSand(Grid* grid) {
     // move cells down
     for (int64_t y = ROWS_Y-1; y >= 0; y--) {
         for (int64_t x = COLUMNS_X-1; x >=0; x--) {
-            if (!(grid->cellHasMaterial(x,y))) {
+            if (!(grid->cellHasSand(x,y))) {
                 continue;
             }
 
@@ -201,19 +236,14 @@ static void simulateSand(Grid* grid) {
             pos.y = (float)y;
 
             bool is_room_bellow = false;
-            if (isInRangeVec2(bellow_pos)) {
-                if (!grid->cellHasMaterialVec2(bellow_pos)) {
+            if (grid->isInRangeVec2(bellow_pos)) {
+                if (!grid->cellHasSandVec2(bellow_pos)) {
                     is_room_bellow = true;
                 }
             }
 
             if (is_room_bellow) {
-                grid->moveCellVec2(pos, bellow_pos);
-                if (!grid->cellHasMaterialVec2(bellow_pos)) {
-                    TODO();
-                }
-
-                
+                grid->moveCellVec2(pos, bellow_pos);            
             }
 
         }
@@ -223,14 +253,17 @@ static void simulateSand(Grid* grid) {
     // move sand left
     for (int64_t y = ROWS_Y-1; y>=0; y--) {
         for (int64_t x = COLUMNS_X-1; x >=0; x--) {
-            if (!grid->cellHasMaterial(x,y)) {
+            // skip empty cells
+            if (!grid->cellHasSand(x,y)) {
                 continue;
             }
 
+            // skip moved cells
             if (grid->isCellMoved(x,y)) {
                 continue;
             }
             
+            // move left
             Vector2 pos;
             pos.x = x;
             pos.y = y;
@@ -245,15 +278,15 @@ static void simulateSand(Grid* grid) {
 
 
             bool is_room_left = false;
-            if (isInRangeVec2(left_pos)) {
-                if (!grid->cellHasMaterialVec2(left_pos)) {
+            if (grid->isInRangeVec2(left_pos)) {
+                if (!grid->cellHasSandVec2(left_pos)) {
                     is_room_left = true;
                 }
             }
 
             bool is_room_right = false;
-            if (isInRangeVec2(right_pos)) {
-                if (!grid->cellHasMaterialVec2(right_pos)) {
+            if (grid->isInRangeVec2(right_pos)) {
+                if (!grid->cellHasSandVec2(right_pos)) {
                     is_room_right = true;
                 }
             }
@@ -269,9 +302,12 @@ static void simulateSand(Grid* grid) {
                     can_left = false;
                     can_right = true;
                 } else {
-                    std::cerr << "Out of range " << value << "\n";
-                    TODO();
+                    if (BOUNDS_ASSERTIONS) {
+                        std::cerr << "Out of range " << value << "\n";
+                        TODO();
+                    }
                 }
+                
             } else {
                 can_left = true;
                 can_right = true;
@@ -287,7 +323,7 @@ static void simulateSand(Grid* grid) {
     // move sand right
     for (int64_t y=ROWS_Y-1; y>=0; y--) {
         for (int64_t x=0; x < COLUMNS_X; x++) {
-            if (!grid->cellHasMaterial(x,y)) {
+            if (!grid->cellHasSand(x,y)) {
                 continue;
             }
             if (grid->isCellMoved(x,y)) {
@@ -307,15 +343,15 @@ static void simulateSand(Grid* grid) {
             right_pos.y = y+1;
 
             bool is_room_left = false;
-            if (isInRangeVec2(left_pos)) {
-                if (!grid->cellHasMaterialVec2(left_pos)) {
+            if (grid->isInRangeVec2(left_pos)) {
+                if (!grid->cellHasSandVec2(left_pos)) {
                     is_room_left = true;
                 }
             }
 
             bool is_room_right = false;
-            if (isInRangeVec2(right_pos)) {
-                if (!grid->cellHasMaterialVec2(right_pos)) {
+            if (grid->isInRangeVec2(right_pos)) {
+                if (!grid->cellHasSandVec2(right_pos)) {
                     is_room_right = true;
                 }
             }
@@ -331,7 +367,7 @@ static void simulateSand(Grid* grid) {
 }
 
 static Texture2D genTexture2d() {
-    auto image = GenImageColor(WIDTH, HEIGHT,RED);
+    auto image = GenImageColor(WIDTH, HEIGHT, WHITE);
     auto texture = LoadTextureFromImage(image);
     UnloadImage(image);
 
@@ -341,14 +377,24 @@ static Texture2D genTexture2d() {
 static void updateTexture(Texture2D* texture, std::vector<int>* backing, Grid* grid) {
     for (int x = 0; x < COLUMNS_X; x++) {
         for (int y = 0; y < ROWS_Y; y++) {
-            int& backing_ref = (*backing).at((y * COLUMNS_X) + x);
-            
-            bool has_material = (*grid).cellHasMaterial(x,y);
-
-            if (has_material) {
-                backing_ref = INT32_MAX;
+            int* backing_ptr = NULL;
+            if (BOUNDS_ASSERTIONS) {
+                int& backing_ref = (*backing).at((y * COLUMNS_X) + x);
+                backing_ptr = &backing_ref;
             } else {
-                backing_ref = 0;
+                int& backing_ref = (*backing)[((y * COLUMNS_X) + x)];
+                backing_ptr = &backing_ref;
+            }
+            
+            
+            bool has_sand = (*grid).cellHasSand(x,y);
+            
+            
+            if (has_sand) {
+                Color light_yellow = Color{0xFB,0xF1,0xB9, 255};
+                *backing_ptr = *(int*)(Color*)(&light_yellow);
+            } else {
+                *backing_ptr = 0;
             }
         } 
     }
@@ -424,7 +470,7 @@ int main() {
 
             for (double x = positionMin.x; x < positionMax.x; x++) {
                 for (double y = positionMin.y; y < positionMax.y; y++) {
-                    grid.setCellMaterial(x,y);
+                    grid.setCellSand(x,y);
                 }
             }
         }
@@ -435,7 +481,7 @@ int main() {
             ClearBackground(BLACK);
             DrawFPS(10, 10);
 
-            DrawTexture(texture , 0, 0, RED);
+            DrawTexture(texture , 0, 0, Color{0xFF,0xFF,0xFF,0xFF});
             
         }
         EndDrawing();
