@@ -218,6 +218,116 @@ static void simulateSand(Grid* grid) {
 
         }
     }
+
+    // right to left, top to bottom
+    // move sand left
+    for (int64_t y = ROWS_Y-1; y>=0; y--) {
+        for (int64_t x = COLUMNS_X-1; x >=0; x--) {
+            if (!grid->cellHasMaterial(x,y)) {
+                continue;
+            }
+
+            if (grid->isCellMoved(x,y)) {
+                continue;
+            }
+            
+            Vector2 pos;
+            pos.x = x;
+            pos.y = y;
+
+            Vector2 left_pos;
+            left_pos.x = x-1;
+            left_pos.y = y+1;
+
+            Vector2 right_pos;
+            right_pos.x = x+1;
+            right_pos.y = y+1;
+
+
+            bool is_room_left = false;
+            if (isInRangeVec2(left_pos)) {
+                if (!grid->cellHasMaterialVec2(left_pos)) {
+                    is_room_left = true;
+                }
+            }
+
+            bool is_room_right = false;
+            if (isInRangeVec2(right_pos)) {
+                if (!grid->cellHasMaterialVec2(right_pos)) {
+                    is_room_right = true;
+                }
+            }
+
+            bool can_left = false;
+            bool can_right = false;
+            if (is_room_left && is_room_right) {
+                int value = GetRandomValue(0,1);
+                if (value == 0) {
+                    can_left = true;
+                    can_right = false;
+                } else if (value == 1) {
+                    can_left = false;
+                    can_right = true;
+                } else {
+                    std::cerr << "Out of range " << value << "\n";
+                    TODO();
+                }
+            } else {
+                can_left = true;
+                can_right = true;
+            }
+
+            if (is_room_left && can_left) {
+                grid->moveCellVec2(pos, left_pos);
+            }
+        }
+    }
+
+    // left to right top to bottom
+    // move sand right
+    for (int64_t y=ROWS_Y-1; y>=0; y--) {
+        for (int64_t x=0; x < COLUMNS_X; x++) {
+            if (!grid->cellHasMaterial(x,y)) {
+                continue;
+            }
+            if (grid->isCellMoved(x,y)) {
+                continue;
+            }
+
+            Vector2 pos;
+            pos.x = x;
+            pos.y = y;
+
+            Vector2 left_pos;
+            left_pos.x = x-1;
+            left_pos.y = y+1;
+
+            Vector2 right_pos;
+            right_pos.x = x+1;
+            right_pos.y = y+1;
+
+            bool is_room_left = false;
+            if (isInRangeVec2(left_pos)) {
+                if (!grid->cellHasMaterialVec2(left_pos)) {
+                    is_room_left = true;
+                }
+            }
+
+            bool is_room_right = false;
+            if (isInRangeVec2(right_pos)) {
+                if (!grid->cellHasMaterialVec2(right_pos)) {
+                    is_room_right = true;
+                }
+            }
+
+            // if the previous loop doesn't move the cell left, this one will move it right
+            bool can_right = true;  
+            if (is_room_right && can_right) {
+                grid->moveCellVec2(pos, right_pos);
+            }
+
+        }
+    }
 }
 
 static Texture2D genTexture2d() {
