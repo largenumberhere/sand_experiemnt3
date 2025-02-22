@@ -1,4 +1,8 @@
 #include "raylib.h"
+
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
 #include <cstdint>
 #include <iostream>
 #include <vector>
@@ -21,44 +25,31 @@ static void todoImpl(uint64_t line, const char* file) {
     todoImpl(__LINE__, __FILE__)
 
 
-
-// static void setBit(uint8_t* val, int n, bool state) {
-//     *val ^= *val & (1 << n);
-//     *val |= state << n;
-// }
-
-// static bool getBit(uint8_t value, int index) {
-//     return (value >> index) & 1;
-// }
-
-
-
-
-
-
 class Grid {
     
 
     private:
         /*
             Each cell is encoded in as bits. Each bit has a specific purpose
-            | Offset    | Description                               | Name          |
-            |-----------|-------------------------------------------|---------------|
-            | 0         | true if the cell has a sand-like material | _SAND_FLAG    |
-            | 1         | temporary boolean for use in simulation   | _MOVED_FLAG   |
+            | Offset    | Description                                               | Name                  |
+            |-----------|-----------------------------------------------------------|-----------------------|
+            | 0         | true if the cell has a sand-like material                 | _SAND_FLAG            |               
+            | 1         | temporary boolean for use in sand moveemnt simulation     | _MOVED_FLAG           |
         */
-        typedef uint64_t Cell;
+        typedef uint8_t Cell;
    
         static const int _LEN =  (COLUMNS_X * ROWS_Y);
         static const int _SAND_FLAG = (0);
         static const int _MOVED_FLAG = (1);
+        static const int _WATER_FLAG = (2);
+        
 
 
         std::vector<Cell> _cells = std::vector<Cell>();
         static const int _CELL_SIZE = sizeof(_cells[0]);
 
         
-        inline static void setCellBit(uint64_t* val, int n, bool state) {
+        inline static void setCellBit(Cell* val, int n, bool state) {
             *val ^= *val & (1 << n);
             *val |= state << n;
         }
@@ -102,6 +93,8 @@ class Grid {
                 _cells.push_back(0);
             }
         }
+
+
 
         // bounds checks
         inline static bool isInRange(uint64_t x, uint64_t y) {
@@ -162,6 +155,33 @@ class Grid {
             setCellBit(cell, _SAND_FLAG, true);
         }
 
+        inline void setCellWater(uint64_t x, uint64_t y) {
+            if (!rangeCheck(x,y)) {
+                TODO();
+            }
+            Cell* cell = getCell(x,y);
+            setCellBit(cell, _WATER_FLAG, true);
+        }
+
+        inline bool isCellWater(uint64_t x, uint64_t y) {
+            if (!rangeCheck(x,y)) {
+                TODO();
+            }
+            Cell* cell = getCell(x,y);
+            return getCellBit(*cell, _WATER_FLAG);
+        }
+
+        inline bool cellHasMaterial(uint64_t x, uint64_t y) {
+            return isCellWater(x,y) || cellHasSand(x,y);
+        }
+
+        inline bool cellHasMaterialVec2(Vector2 pos) {
+            int x = pos.x;
+            int y = pos.y;
+            return isCellWater(x,y) || cellHasSand(x,y);
+        }
+
+
         inline void resetCell(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
@@ -179,7 +199,7 @@ class Grid {
         }
 
         // only call once per loop
-        inline void setCellsNotMoved() {
+        inline void clearTempMovement() {
             for (uint64_t y = 0; y < ROWS_Y; y++) {
                 for (uint64_t x = 0; x < COLUMNS_X; x+=8) {
                     if (!rangeCheck(x,y) || !(rangeCheck(x+7, y))) {
@@ -192,6 +212,7 @@ class Grid {
                     for (uint64_t i = 0; i < 8; i++) {
                         setCellBit(eight_cells + i, _MOVED_FLAG, false);
                     }
+
     
                 }
             }
@@ -210,159 +231,179 @@ class Grid {
 
 
 
-static void simulateSand(Grid* grid) {
+static void simulateGrid(Grid* grid) {
     sizeof(Grid);
-    (*grid).setCellsNotMoved();
+    (*grid).clearTempMovement();
 
     // right to left, bottom to top
-    // move cells down
     for (int64_t y = ROWS_Y-1; y >= 0; y--) {
         for (int64_t x = COLUMNS_X-1; x >=0; x--) {
-            if (!(grid->cellHasSand(x,y))) {
-                continue;
-            }
-
-            if (grid->isCellMoved(x,y)) {
-                continue;
-            }
-
             
-            Vector2 bellow_pos;
-            bellow_pos.x = (float)x;
-            bellow_pos.y = (float)(y+1);
-            
-            Vector2 pos;
-            pos.x = (float)x;
-            pos.y = (float)y;
+            /*
+                [ ]
+                 v
+                [ ]     
+                move cells down
+            */
+            if ((grid->cellHasSand(x,y)) && ! grid->isCellMoved(x,y)) {
+                Vector2 bellow_pos;
+                bellow_pos.x = (float)x;
+                bellow_pos.y = (float)(y+1);
+                
+                Vector2 pos;
+                pos.x = (float)x;
+                pos.y = (float)y;
 
-            bool is_room_bellow = false;
-            if (grid->isInRangeVec2(bellow_pos)) {
-                if (!grid->cellHasSandVec2(bellow_pos)) {
-                    is_room_bellow = true;
+                bool is_room_bellow = false;
+                if (grid->isInRangeVec2(bellow_pos)) {
+                    if (!grid->cellHasMaterialVec2(bellow_pos)) {
+                        is_room_bellow = true;
+                    }
+                }
+
+                if (is_room_bellow) {
+                    grid->moveCellVec2(pos, bellow_pos);            
                 }
             }
 
-            if (is_room_bellow) {
-                grid->moveCellVec2(pos, bellow_pos);            
-            }
+            if (grid->isCellWater(x,y) && !grid->isCellMoved(x,y)) {
+                Vector2 bellow_pos;
+                bellow_pos.x = (float)x;
+                bellow_pos.y = (float)(y+1);
+                
+                Vector2 pos;
+                pos.x = (float)x;
+                pos.y = (float)y;
 
+                bool is_room_bellow = false;
+                if (grid->isInRangeVec2(bellow_pos)) {
+                    if (!grid->cellHasMaterialVec2(bellow_pos)) {
+                        is_room_bellow = true;
+                    }
+                }
+
+                if (is_room_bellow) {
+                    grid->moveCellVec2(pos, bellow_pos);            
+                }
+            }
         }
     }
 
     // right to left, top to bottom
-    // move sand left
     for (int64_t y = ROWS_Y-1; y>=0; y--) {
         for (int64_t x = COLUMNS_X-1; x >=0; x--) {
-            // skip empty cells
-            if (!grid->cellHasSand(x,y)) {
-                continue;
-            }
+            /*
+                move diagonal left
+                
+                    <- [ ]
+                [ ]
+            */
+            if (grid->cellHasSand(x,y) && !grid->isCellMoved(x,y)) {
+                Vector2 pos;
+                pos.x = x;
+                pos.y = y;
 
-            // skip moved cells
-            if (grid->isCellMoved(x,y)) {
-                continue;
-            }
-            
-            // move left
-            Vector2 pos;
-            pos.x = x;
-            pos.y = y;
+                Vector2 left_pos;
+                left_pos.x = x-1;
+                left_pos.y = y+1;
 
-            Vector2 left_pos;
-            left_pos.x = x-1;
-            left_pos.y = y+1;
-
-            Vector2 right_pos;
-            right_pos.x = x+1;
-            right_pos.y = y+1;
+                Vector2 right_pos;
+                right_pos.x = x+1;
+                right_pos.y = y+1;
 
 
-            bool is_room_left = false;
-            if (grid->isInRangeVec2(left_pos)) {
-                if (!grid->cellHasSandVec2(left_pos)) {
-                    is_room_left = true;
-                }
-            }
-
-            bool is_room_right = false;
-            if (grid->isInRangeVec2(right_pos)) {
-                if (!grid->cellHasSandVec2(right_pos)) {
-                    is_room_right = true;
-                }
-            }
-
-            bool can_left = false;
-            bool can_right = false;
-            if (is_room_left && is_room_right) {
-                int value = GetRandomValue(0,1);
-                if (value == 0) {
-                    can_left = true;
-                    can_right = false;
-                } else if (value == 1) {
-                    can_left = false;
-                    can_right = true;
-                } else {
-                    if (BOUNDS_ASSERTIONS) {
-                        std::cerr << "Out of range " << value << "\n";
-                        TODO();
+                bool is_room_left = false;
+                if (grid->isInRangeVec2(left_pos)) {
+                    if (!grid->cellHasMaterialVec2(left_pos)) {
+                        is_room_left = true;
                     }
                 }
-                
-            } else {
-                can_left = true;
-                can_right = true;
-            }
 
-            if (is_room_left && can_left) {
-                grid->moveCellVec2(pos, left_pos);
+                bool is_room_right = false;
+                if (grid->isInRangeVec2(right_pos)) {
+                    if (!grid->cellHasMaterialVec2(right_pos)) {
+                        is_room_right = true;
+                    }
+                }
+
+                bool can_left = false;
+                bool can_right = false;
+                if (is_room_left && is_room_right) {
+                    int value = -1;
+                    
+                    value = GetRandomValue(0,1);
+
+                    if (value == 0) {
+                        can_left = true;
+                        can_right = false;
+                    } else if (value == 1) {
+                        can_left = false;
+                        can_right = true;
+                    } else {
+                        if (BOUNDS_ASSERTIONS) {
+                            std::cerr << "Out of range " << value << "\n";
+                            TODO();
+                        }
+                    }
+                    
+                } else {
+                    can_left = true;
+                    can_right = true;
+                }
+
+                if (is_room_left && can_left) {
+                    grid->moveCellVec2(pos, left_pos);
+                }
             }
         }
     }
 
+
+
     // left to right top to bottom
-    // move sand right
     for (int64_t y=ROWS_Y-1; y>=0; y--) {
+  
         for (int64_t x=0; x < COLUMNS_X; x++) {
-            if (!grid->cellHasSand(x,y)) {
-                continue;
-            }
-            if (grid->isCellMoved(x,y)) {
-                continue;
-            }
 
-            Vector2 pos;
-            pos.x = x;
-            pos.y = y;
+        //     move diagonal right
+                
+        // [ ] ->
+        //       [ ]
+            if (grid->cellHasSand(x,y) && !grid->isCellMoved(x,y)) {
+                Vector2 pos;
+                pos.x = x;
+                pos.y = y;
 
-            Vector2 left_pos;
-            left_pos.x = x-1;
-            left_pos.y = y+1;
+                Vector2 left_pos;
+                left_pos.x = x-1;
+                left_pos.y = y+1;
 
-            Vector2 right_pos;
-            right_pos.x = x+1;
-            right_pos.y = y+1;
+                Vector2 right_pos;
+                right_pos.x = x+1;
+                right_pos.y = y+1;
 
-            bool is_room_left = false;
-            if (grid->isInRangeVec2(left_pos)) {
-                if (!grid->cellHasSandVec2(left_pos)) {
-                    is_room_left = true;
+                bool is_room_left = false;
+                if (grid->isInRangeVec2(left_pos)) {
+                    if (!grid->cellHasMaterialVec2(left_pos)) {
+                        is_room_left = true;
+                    }
+                }
+
+                bool is_room_right = false;
+                if (grid->isInRangeVec2(right_pos)) {
+                    if (!grid->cellHasMaterialVec2(right_pos)) {
+                        is_room_right = true;
+                    }
+                }
+
+                // if the previous loop doesn't move the cell left, this one will move it right
+                bool can_right = true;  
+                if (is_room_right && can_right) {
+                    grid->moveCellVec2(pos, right_pos);
                 }
             }
-
-            bool is_room_right = false;
-            if (grid->isInRangeVec2(right_pos)) {
-                if (!grid->cellHasSandVec2(right_pos)) {
-                    is_room_right = true;
-                }
-            }
-
-            // if the previous loop doesn't move the cell left, this one will move it right
-            bool can_right = true;  
-            if (is_room_right && can_right) {
-                grid->moveCellVec2(pos, right_pos);
-            }
-
         }
+
     }
 }
 
@@ -387,12 +428,12 @@ static void updateTexture(Texture2D* texture, std::vector<int>* backing, Grid* g
             }
             
             
-            bool has_sand = (*grid).cellHasSand(x,y);
-            
-            
-            if (has_sand) {
+            if (grid->cellHasSand(x,y)) {
                 Color light_yellow = Color{0xFB,0xF1,0xB9, 255};
                 *backing_ptr = *(int*)(Color*)(&light_yellow);
+            } else if (grid->isCellWater(x,y)) {
+                Color blue = Color{0x00,0x6E,0xE6, 255};
+                *backing_ptr = *(int*)(Color*)(&blue);
             } else {
                 *backing_ptr = 0;
             }
@@ -429,7 +470,10 @@ static Vector2 clampGridPos(Vector2 pos) {
     return pos;
 }
 
-
+enum CursorMode : uint8_t{
+    CUR_SAND,
+    CUR_WATER,
+};
 
 int main() {
 
@@ -439,13 +483,14 @@ int main() {
     std::vector<int> texture_backing = std::vector<int>(COLUMNS_X * ROWS_Y);
     
     Grid grid = Grid();
+    CursorMode cursor_mode = CUR_SAND;
 
     while (!WindowShouldClose())
     {
         double time_now = GetTime();
         if (time + 0.02 <= time_now) {
             time = time_now;
-            simulateSand(&grid);
+            simulateGrid(&grid);
             updateTexture(&texture, &texture_backing, &grid);
         }
 
@@ -470,19 +515,27 @@ int main() {
 
             for (double x = positionMin.x; x < positionMax.x; x++) {
                 for (double y = positionMin.y; y < positionMax.y; y++) {
-                    grid.setCellSand(x,y);
+                    if (cursor_mode == CUR_SAND) {
+                        grid.setCellSand(x,y);
+                    } else if (cursor_mode == CUR_WATER) {
+                        grid.setCellWater(x,y);
+                    }
                 }
             }
         }
+
 
         // draw
         BeginDrawing();
         {
             ClearBackground(BLACK);
-            DrawFPS(10, 10);
+            if (GuiButton(Rectangle{0,0, 100, 100}, "Water")) {
+                cursor_mode = CUR_WATER;
+            }
 
+            DrawFPS(10, 10);
             DrawTexture(texture , 0, 0, Color{0xFF,0xFF,0xFF,0xFF});
-            
+      
         }
         EndDrawing();
     }
