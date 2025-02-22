@@ -21,6 +21,18 @@ static void todoImpl(uint64_t line, const char* file) {
 }
 
 
+inline static void setBit(uint8_t* val, int n, bool state) {
+    *val ^= *val & (1 << n);
+    *val |= state << n;
+}
+
+inline static bool getBit(uint8_t value, int n) {
+    return (value >> n) & 1;
+}
+
+
+
+
 #define TODO() \
     todoImpl(__LINE__, __FILE__)
 
@@ -31,24 +43,28 @@ class Grid {
     private:
         /*
             Each cell is encoded in as bits. Each bit has a specific purpose
-            | Offset    | Description                                               | Name                  |
-            |-----------|-----------------------------------------------------------|-----------------------|
-            | 0         | true if the cell has a sand-like material                 | _SAND_FLAG            |               
-            | 1         | temporary boolean for use in sand moveemnt simulation     | _MOVED_FLAG           |
-        */
-        typedef uint8_t Cell;
-   
-        static const int _LEN =  (COLUMNS_X * ROWS_Y);
-        static const int _SAND_FLAG = (0);
-        static const int _MOVED_FLAG = (1);
-        static const int _WATER_FLAG = (2);
+            | Offset    | Name                  |
+            |-----------|-----------------------|
+            | 0         | _SAND_FLAG            |               
+            | 1         | _MOVED_FLAG           |
+            | 2         |                       |
+            | 3         |                       |
+            | 4        |                       |
         
+            */
+        typedef uint64_t Cell;
+
+        static const int _LEN =  (COLUMNS_X * ROWS_Y);
+        static const int _SAND_PHYSICS_FLAG = (0);
+        static const int _MOVED_FLAG = (1);
+        static const int _WATER_PHYSICS_FLAG = (2);
+        static const int _SAND_TYPE = (3);
+        static const int _WATER_TYPE = (4);
 
 
         std::vector<Cell> _cells = std::vector<Cell>();
         static const int _CELL_SIZE = sizeof(_cells[0]);
 
-        
         inline static void setCellBit(Cell* val, int n, bool state) {
             *val ^= *val & (1 << n);
             *val |= state << n;
@@ -94,8 +110,6 @@ class Grid {
             }
         }
 
-
-
         // bounds checks
         inline static bool isInRange(uint64_t x, uint64_t y) {
             if (y >= ROWS_Y || x >= COLUMNS_X || y < 0 || x < 0) {
@@ -105,29 +119,29 @@ class Grid {
             return true;
         }
         
-        inline static bool isInRangeVec2(Vector2 vec) {
+        inline static bool isInRangeV(Vector2 vec) {
             return isInRange(vec.x, vec.y);
         }
 
         // if the cell is a sand-like material
-        inline bool cellHasSand(uint64_t x, uint64_t y){
+        inline bool cellHasSandPhysics(uint64_t x, uint64_t y){
             if (!rangeCheck(x,y)) {
                 TODO();
             }
             auto * cell = getCell(x,y);
-            bool material_flag = getCellBit(*cell, _SAND_FLAG);
+            bool material_flag = getCellBit(*cell, _SAND_PHYSICS_FLAG);
             
             return material_flag == 1;
         }
 
-        inline bool cellHasSandVec2(Vector2 pos) {
+        inline bool cellHasSandPhysicsV(Vector2 pos) {
             if (!rangeCheck(pos.x,pos.y)) {
                 TODO();
             }
-            return cellHasSand(pos.x, pos.y);
+            return cellHasSandPhysics(pos.x, pos.y);
         }
 
-        inline void moveCellVec2(Vector2 from, Vector2 to) {
+        inline void cellMoveV(Vector2 from, Vector2 to) {
             if (!rangeCheck(from.x,from.y)) {
                 TODO();
             }
@@ -143,46 +157,100 @@ class Grid {
             *from_cell = 0;
             *to_cell = from_copy;
 
-            setCellMoved(to.x, to.y);
+            cellSetMoved(to.x, to.y);
+        }
+
+        inline void cellSwapV(Vector2 from, Vector2 to) {
+            if (!rangeCheck(from.x, to.y)) {
+                TODO();
+            }
+
+            if (!rangeCheck(from.x, to.y)) {
+                TODO();
+            }
+
+            Cell* cell_a = getCell(from.x, from.y);
+            Cell* cell_b = getCell(to.x, to.y);
+
+            // the actual swap
+            Cell cell_b_copy = (*cell_b);
+            *cell_b = *cell_a;
+            *cell_a = cell_b_copy;
+
+            // cellSetMoved(from.x, from.y);
+            // cellSetMoved(b.x, b.y);
         }
 
         // set the sand bit to true
-        inline void setCellSand(uint64_t x, uint64_t y){
+        inline void cellSetSandPhysics(uint64_t x, uint64_t y){
             if (!rangeCheck(x,y)) {
                 TODO();
             }
             Cell* cell = getCell(x,y);
-            setCellBit(cell, _SAND_FLAG, true);
+            setCellBit(cell, _SAND_PHYSICS_FLAG, true);
         }
 
-        inline void setCellWater(uint64_t x, uint64_t y) {
+        inline void cellSetWaterPhysics(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
             Cell* cell = getCell(x,y);
-            setCellBit(cell, _WATER_FLAG, true);
+            setCellBit(cell, _SAND_PHYSICS_FLAG, true);
+            setCellBit(cell, _WATER_PHYSICS_FLAG, true);
         }
 
-        inline bool isCellWater(uint64_t x, uint64_t y) {
+        inline void cellSetWaterV(Vector2 pos) {
+            if (!rangeCheck(pos.x,pos.y)) {
+                TODO();
+            }
+            Cell* cell = getCell(pos.x,pos.y);
+
+            cellSetWaterPhysics(pos.x, pos.y);
+            setCellBit(cell, _WATER_TYPE, true);
+        }
+
+        inline void cellSetSandV(Vector2 pos) {
+            cellSetSandPhysics(pos.x, pos.y);
+            Cell* cell = getCell(pos.x, pos.y);
+            setCellBit(cell, _SAND_TYPE, true);
+        }
+
+        inline bool cellHasWater(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
             Cell* cell = getCell(x,y);
-            return getCellBit(*cell, _WATER_FLAG);
+            return getCellBit(*cell, _WATER_TYPE);
+        }
+
+        inline bool cellHasWaterV(Vector2 pos) {
+            return cellHasWater(pos.x, pos.y);
+        }
+
+        inline bool cellHasSand(uint64_t x, uint64_t y) {
+            if (!rangeCheck(x,y)) {
+                TODO();
+            }
+            Cell* cell = getCell(x,y);
+            return getCellBit(*cell, _SAND_TYPE);
+        }
+
+        inline bool cellHasSandV(Vector2 pos) {
+            return cellHasSand(pos.x, pos.y);
         }
 
         inline bool cellHasMaterial(uint64_t x, uint64_t y) {
-            return isCellWater(x,y) || cellHasSand(x,y);
+            return cellHasWater(x,y) || cellHasSand(x,y);
         }
 
-        inline bool cellHasMaterialVec2(Vector2 pos) {
+        inline bool cellHasMaterialV(Vector2 pos) {
             int x = pos.x;
             int y = pos.y;
-            return isCellWater(x,y) || cellHasSand(x,y);
+            return cellHasWater(x,y) || cellHasSand(x,y);
         }
 
 
-        inline void resetCell(uint64_t x, uint64_t y) {
+        inline void cellReset(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
@@ -190,7 +258,7 @@ class Grid {
             *cell = 0;
         }
 
-        inline void setCellMoved(uint64_t x, uint64_t y) {
+        inline void cellSetMoved(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
@@ -218,7 +286,7 @@ class Grid {
             }
         }
 
-        inline bool isCellMoved(uint64_t x, uint64_t y) {
+        inline bool cellIsMoved(uint64_t x, uint64_t y) {
             if (!rangeCheck(x,y)) {
                 TODO();
             }
@@ -227,6 +295,24 @@ class Grid {
             
             return moved;
         }
+
+        inline uint8_t cellDensityV(Vector2 pos) {
+            int density = -1;
+            
+            if (cellHasSandV(pos)) {
+                density = 0;
+            } else if (cellHasWaterV(pos)) {
+                density = 1;
+            } else {
+                density = -1;
+            }
+
+            if (density == -1) {
+                TODO();
+            }
+
+            return density;
+        }
 };
 
 
@@ -234,6 +320,64 @@ class Grid {
 static void simulateGrid(Grid* grid) {
     sizeof(Grid);
     (*grid).clearTempMovement();
+
+    // bottom to top, left to right
+    // density swapping
+    for (int64_t y = ROWS_Y-1; y >= 0; y--) {
+        for (int64_t x = 0; x < COLUMNS_X; x++) {
+            Vector2 pos;
+            pos.x = x;
+            pos.y = y;
+            
+            Vector2 pos_up;
+            pos_up.x = x;
+            pos_up.y = y-1;
+
+            if (grid->cellHasMaterialV(pos)) {
+                if (grid->isInRangeV(pos_up) && grid->cellHasMaterialV(pos_up)) {
+                    uint8_t density = grid->cellDensityV(pos);
+                    uint8_t density_up = grid->cellDensityV(pos_up);
+
+                    if (density_up > density) {
+                        grid->cellSwapV(pos, pos_up);
+                    }            
+                }
+            }
+        }
+    }
+
+    // right to left, bottom to top
+    // for (int64_t y = ROWS_Y-1; y >= 0; y--) {
+    //     for (int64_t x = COLUMNS_X-1; x >=0; x--) {
+    //         if (!grid->isInRange(x,y)) {
+    //             TODO();
+    //         }
+
+    //         Vector2 pos;
+    //         pos.x = x;
+    //         pos.y = y;
+            
+    //         Vector2 right_pos;
+    //         right_pos.x = x+1;
+    //         right_pos.y = y;
+    //         if (!grid->isInRangeV(right_pos)) {
+    //             continue;
+    //         }
+
+    //         Vector2 bottom_right_pos;
+    //         bottom_right_pos.x = x+1;
+    //         bottom_right_pos.y = y+1;
+    //         if(!grid->isInRangeV(bottom_right_pos)) {
+    //             bottom_right_pos = right_pos;
+    //         }
+
+    //         if (grid->cellHasWaterV(pos) && grid->cellHasMaterialV(right_pos) && grid->cellHasMaterialV(bottom_right_pos)) {
+    //             grid->cellMoveV(pos, right_pos);
+    //         }
+
+    //     }
+    // }
+
 
     // right to left, bottom to top
     for (int64_t y = ROWS_Y-1; y >= 0; y--) {
@@ -245,7 +389,7 @@ static void simulateGrid(Grid* grid) {
                 [ ]     
                 move cells down
             */
-            if ((grid->cellHasSand(x,y)) && ! grid->isCellMoved(x,y)) {
+            if ((grid->cellHasSandPhysics(x,y)) && ! grid->cellIsMoved(x,y)) {
                 Vector2 bellow_pos;
                 bellow_pos.x = (float)x;
                 bellow_pos.y = (float)(y+1);
@@ -255,35 +399,14 @@ static void simulateGrid(Grid* grid) {
                 pos.y = (float)y;
 
                 bool is_room_bellow = false;
-                if (grid->isInRangeVec2(bellow_pos)) {
-                    if (!grid->cellHasMaterialVec2(bellow_pos)) {
+                if (grid->isInRangeV(bellow_pos)) {
+                    if (!grid->cellHasMaterialV(bellow_pos)) {
                         is_room_bellow = true;
                     }
                 }
 
                 if (is_room_bellow) {
-                    grid->moveCellVec2(pos, bellow_pos);            
-                }
-            }
-
-            if (grid->isCellWater(x,y) && !grid->isCellMoved(x,y)) {
-                Vector2 bellow_pos;
-                bellow_pos.x = (float)x;
-                bellow_pos.y = (float)(y+1);
-                
-                Vector2 pos;
-                pos.x = (float)x;
-                pos.y = (float)y;
-
-                bool is_room_bellow = false;
-                if (grid->isInRangeVec2(bellow_pos)) {
-                    if (!grid->cellHasMaterialVec2(bellow_pos)) {
-                        is_room_bellow = true;
-                    }
-                }
-
-                if (is_room_bellow) {
-                    grid->moveCellVec2(pos, bellow_pos);            
+                    grid->cellMoveV(pos, bellow_pos);            
                 }
             }
         }
@@ -298,7 +421,7 @@ static void simulateGrid(Grid* grid) {
                     <- [ ]
                 [ ]
             */
-            if (grid->cellHasSand(x,y) && !grid->isCellMoved(x,y)) {
+            if (grid->cellHasSandPhysics(x,y) && !grid->cellIsMoved(x,y)) {
                 Vector2 pos;
                 pos.x = x;
                 pos.y = y;
@@ -313,15 +436,15 @@ static void simulateGrid(Grid* grid) {
 
 
                 bool is_room_left = false;
-                if (grid->isInRangeVec2(left_pos)) {
-                    if (!grid->cellHasMaterialVec2(left_pos)) {
+                if (grid->isInRangeV(left_pos)) {
+                    if (!grid->cellHasMaterialV(left_pos)) {
                         is_room_left = true;
                     }
                 }
 
                 bool is_room_right = false;
-                if (grid->isInRangeVec2(right_pos)) {
-                    if (!grid->cellHasMaterialVec2(right_pos)) {
+                if (grid->isInRangeV(right_pos)) {
+                    if (!grid->cellHasMaterialV(right_pos)) {
                         is_room_right = true;
                     }
                 }
@@ -352,7 +475,7 @@ static void simulateGrid(Grid* grid) {
                 }
 
                 if (is_room_left && can_left) {
-                    grid->moveCellVec2(pos, left_pos);
+                    grid->cellMoveV(pos, left_pos);
                 }
             }
         }
@@ -369,7 +492,7 @@ static void simulateGrid(Grid* grid) {
                 
         // [ ] ->
         //       [ ]
-            if (grid->cellHasSand(x,y) && !grid->isCellMoved(x,y)) {
+            if (grid->cellHasSandPhysics(x,y) && !grid->cellIsMoved(x,y)) {
                 Vector2 pos;
                 pos.x = x;
                 pos.y = y;
@@ -383,15 +506,15 @@ static void simulateGrid(Grid* grid) {
                 right_pos.y = y+1;
 
                 bool is_room_left = false;
-                if (grid->isInRangeVec2(left_pos)) {
-                    if (!grid->cellHasMaterialVec2(left_pos)) {
+                if (grid->isInRangeV(left_pos)) {
+                    if (!grid->cellHasMaterialV(left_pos)) {
                         is_room_left = true;
                     }
                 }
 
                 bool is_room_right = false;
-                if (grid->isInRangeVec2(right_pos)) {
-                    if (!grid->cellHasMaterialVec2(right_pos)) {
+                if (grid->isInRangeV(right_pos)) {
+                    if (!grid->cellHasMaterialV(right_pos)) {
                         is_room_right = true;
                     }
                 }
@@ -399,7 +522,7 @@ static void simulateGrid(Grid* grid) {
                 // if the previous loop doesn't move the cell left, this one will move it right
                 bool can_right = true;  
                 if (is_room_right && can_right) {
-                    grid->moveCellVec2(pos, right_pos);
+                    grid->cellMoveV(pos, right_pos);
                 }
             }
         }
@@ -431,7 +554,7 @@ static void updateTexture(Texture2D* texture, std::vector<int>* backing, Grid* g
             if (grid->cellHasSand(x,y)) {
                 Color light_yellow = Color{0xFB,0xF1,0xB9, 255};
                 *backing_ptr = *(int*)(Color*)(&light_yellow);
-            } else if (grid->isCellWater(x,y)) {
+            } else if (grid->cellHasWater(x,y)) {
                 Color blue = Color{0x00,0x6E,0xE6, 255};
                 *backing_ptr = *(int*)(Color*)(&blue);
             } else {
@@ -505,8 +628,6 @@ int main() {
             positionMax.y += 12.5;
             positionMax = clampGridPos(mouseToGrid(positionMax));
             
-
-
             Vector2 positionMin = position;
             positionMin.x -=12.5;
             positionMin.y -=12.5;
@@ -516,9 +637,9 @@ int main() {
             for (double x = positionMin.x; x < positionMax.x; x++) {
                 for (double y = positionMin.y; y < positionMax.y; y++) {
                     if (cursor_mode == CUR_SAND) {
-                        grid.setCellSand(x,y);
+                        grid.cellSetSandV(Vector2{(float)x, (float)y});
                     } else if (cursor_mode == CUR_WATER) {
-                        grid.setCellWater(x,y);
+                        grid.cellSetWaterV(Vector2{(float)x, (float)y});
                     }
                 }
             }
@@ -529,8 +650,10 @@ int main() {
         BeginDrawing();
         {
             ClearBackground(BLACK);
-            if (GuiButton(Rectangle{0,0, 100, 100}, "Water")) {
+            if (GuiButton(Rectangle{0,0, 50, 20}, "Water")) {
                 cursor_mode = CUR_WATER;
+            } else if(GuiButton(Rectangle{60, 0, 50, 20}, "Sand")) {
+                cursor_mode = CUR_SAND;
             }
 
             DrawFPS(10, 10);
