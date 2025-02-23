@@ -13,7 +13,7 @@ const int HEIGHT = 768;
 const int COLUMNS_X = WIDTH;
 const int ROWS_Y = HEIGHT;
 
-const int BOUNDS_ASSERTIONS = true;
+const int BOUNDS_ASSERTIONS = false;
 
 static void todoImpl(uint64_t line, const char* file) {
     std::cerr << file << ":" << line << " is todo" << std::endl;
@@ -49,7 +49,7 @@ class Grid {
             | 1         | _MOVED_FLAG           |
             | 2         |                       |
             | 3         |                       |
-            | 4        |                       |
+            | 4         |                       |
         
             */
         typedef uint64_t Cell;
@@ -203,6 +203,7 @@ class Grid {
             if (!rangeCheck(pos.x,pos.y)) {
                 TODO();
             }
+            cellReset(pos.x, pos.y);
             Cell* cell = getCell(pos.x,pos.y);
 
             cellSetWaterPhysics(pos.x, pos.y);
@@ -210,6 +211,7 @@ class Grid {
         }
 
         inline void cellSetSandV(Vector2 pos) {
+            cellReset(pos.x, pos.y);
             cellSetSandPhysics(pos.x, pos.y);
             Cell* cell = getCell(pos.x, pos.y);
             setCellBit(cell, _SAND_TYPE, true);
@@ -296,13 +298,15 @@ class Grid {
             return moved;
         }
 
-        inline uint8_t cellDensityV(Vector2 pos) {
+        inline int64_t cellDensityV(Vector2 pos) {
+            // kg / m3
+
             int density = -1;
             
             if (cellHasSandV(pos)) {
-                density = 0;
+                density = 1420;
             } else if (cellHasWaterV(pos)) {
-                density = 1;
+                density = 998;
             } else {
                 density = -1;
             }
@@ -335,8 +339,8 @@ static void simulateGrid(Grid* grid) {
 
             if (grid->cellHasMaterialV(pos)) {
                 if (grid->isInRangeV(pos_up) && grid->cellHasMaterialV(pos_up)) {
-                    uint8_t density = grid->cellDensityV(pos);
-                    uint8_t density_up = grid->cellDensityV(pos_up);
+                    int64_t density = grid->cellDensityV(pos);
+                    int64_t density_up = grid->cellDensityV(pos_up);
 
                     if (density_up > density) {
                         grid->cellSwapV(pos, pos_up);
@@ -636,10 +640,12 @@ int main() {
 
             for (double x = positionMin.x; x < positionMax.x; x++) {
                 for (double y = positionMin.y; y < positionMax.y; y++) {
-                    if (cursor_mode == CUR_SAND) {
-                        grid.cellSetSandV(Vector2{(float)x, (float)y});
-                    } else if (cursor_mode == CUR_WATER) {
-                        grid.cellSetWaterV(Vector2{(float)x, (float)y});
+                    if (!grid.cellHasMaterial(x, y)) {   
+                        if (cursor_mode == CUR_SAND) {
+                            grid.cellSetSandV(Vector2{(float)x, (float)y});
+                        } else if (cursor_mode == CUR_WATER) {
+                            grid.cellSetWaterV(Vector2{(float)x, (float)y});
+                        }
                     }
                 }
             }
