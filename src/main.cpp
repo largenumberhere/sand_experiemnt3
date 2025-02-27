@@ -413,6 +413,48 @@ static void simulateGrid(Grid* grid) {
                     grid->cellMoveV(pos, bellow_pos);            
                 }
             }
+
+            // stonen from Sam 
+            if ((grid->cellHasWater(x, y)) && !grid->cellIsMoved(x, y)) {
+                Vector2 new_pos;
+                new_pos.x = (float)x + GetRandomValue(-30, 30);
+                new_pos.y = (float)y;
+        
+                Vector2 pos;
+                pos.x = (float)x;
+                pos.y = (float)y;
+        
+                bool is_room = false;
+                if (grid->isInRangeV(new_pos)) {
+
+
+                    // check if path to new water pos is free
+                    bool free_path = true;
+                    if (new_pos.x < x) {
+                        for (int64_t x2 = new_pos.x-1; x2 < x; x2++) {
+                            if (grid->cellHasMaterial(x2, new_pos.y)) {
+                                free_path = false;
+                                break;
+                            }
+                        }
+                    } else if (new_pos.x > x) {
+                        for (int64_t x2 = x; x2 < new_pos.x; x2++) {
+                            if (grid->cellHasMaterial(x2, new_pos.y)) {
+                                free_path = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if ((!grid->cellHasMaterialV(new_pos)) && free_path) {
+                        is_room = true;
+                    }
+                }
+        
+                if (is_room) {
+                    grid->cellMoveV(pos, new_pos);
+                }
+            }
         }
     }
 
@@ -529,9 +571,12 @@ static void simulateGrid(Grid* grid) {
                     grid->cellMoveV(pos, right_pos);
                 }
             }
+
         }
 
     }
+
+
 }
 
 static Texture2D genTexture2d() {
@@ -562,7 +607,8 @@ static void updateTexture(Texture2D* texture, std::vector<int>* backing, Grid* g
                 Color blue = Color{0x00,0x6E,0xE6, 255};
                 *backing_ptr = *(int*)(Color*)(&blue);
             } else {
-                *backing_ptr = 0;
+                Color black = BLACK;
+                *backing_ptr = *(int*)(Color*)(&black);
             }
         } 
     }
@@ -571,13 +617,24 @@ static void updateTexture(Texture2D* texture, std::vector<int>* backing, Grid* g
 }
 
 
+// static int current_width = {0};
+// static int current_height = {0};
+static float CAMERA_ZOOM = {0};
+
+float screen_ratio(int current_size, int default_size) {
+    return (float)current_size / (float)default_size;
+}
+
 static Vector2 mouseToGrid(Vector2 mousePos) {
+    
+    
     Vector2 gridPos;
-    gridPos.x = mousePos.x *1.0;
-    gridPos.y = mousePos.y *1.0;
+    gridPos.x = (mousePos.x) / CAMERA_ZOOM;
+    gridPos.y = (mousePos.y) / CAMERA_ZOOM;
 
     return gridPos;
 }
+
 
 static Vector2 clampGridPos(Vector2 pos) {
     if (pos.x >= COLUMNS_X) {
@@ -602,15 +659,29 @@ enum CursorMode : uint8_t{
     CUR_WATER,
 };
 
-int main() {
 
+int main() {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(WIDTH, HEIGHT, "sand experiment 3");
+    // current_width = GetScreenWidth();
+    // current_height = GetScreenHeight();
+
     double time = GetTime();
     auto texture = genTexture2d();
     std::vector<int> texture_backing = std::vector<int>(COLUMNS_X * ROWS_Y);
     
     Grid grid = Grid();
     CursorMode cursor_mode = CUR_SAND;
+
+    Camera2D camera = {0};
+    camera.offset = Vector2{0, 0};
+    camera.rotation = 0;
+    camera.target = Vector2{0,0};
+    camera.zoom = 1;
+
+    CAMERA_ZOOM = 1;
+
+
 
     while (!WindowShouldClose())
     {
@@ -621,25 +692,49 @@ int main() {
             updateTexture(&texture, &texture_backing, &grid);
         }
 
+        // update camera if window resized
+        if (IsWindowResized()) { 
+            int new_h = GetScreenHeight();
+            int new_w = GetScreenWidth();
+            
+            float ratio_h = screen_ratio(new_h, HEIGHT); // (float)new_h / (float)HEIGHT;
+            float ratio_w = screen_ratio(new_w, WIDTH); // (float)new_w / (float)WIDTH;
+            
+            // smallest ratio means window is smallest along that dimension
+            if (ratio_w < ratio_h) {
+                camera.zoom = ratio_w;
+            } else {
+                camera.zoom = ratio_h;
+            }
+
+            CAMERA_ZOOM = camera.zoom;
+        }
+
 
         // create new pixels that are clicked
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 position = GetMousePosition();
             
-
-            Vector2 positionMax = position;
-            positionMax.x += 12.5;
-            positionMax.y += 12.5;
-            positionMax = clampGridPos(mouseToGrid(positionMax));
             
-            Vector2 positionMin = position;
-            positionMin.x -=12.5;
-            positionMin.y -=12.5;
-            positionMin = clampGridPos(mouseToGrid(positionMin));
+            Vector2 offset_max = Vector2{12.5, 12.5};
+            
+            Vector2 position_max = mouseToGrid(position);
+            position_max.x += offset_max.x;
+            position_max.y += offset_max.y;
+
+            position_max = clampGridPos(position_max);
+            
+            
+            Vector2 offset_min = Vector2{-12.5, -12.5};
+
+            Vector2 position_min = mouseToGrid(position);
+            position_min.x += offset_min.x;
+            position_min.y += offset_min.y;
+            position_min = clampGridPos(position_min);
             
 
-            for (double x = positionMin.x; x < positionMax.x; x++) {
-                for (double y = positionMin.y; y < positionMax.y; y++) {
+            for (double x = position_min.x; x < position_max.x; x++) {
+                for (double y = position_min.y; y < position_max.y; y++) {
                     if (!grid.cellHasMaterial(x, y)) {   
                         if (cursor_mode == CUR_SAND) {
                             grid.cellSetSandV(Vector2{(float)x, (float)y});
@@ -655,7 +750,14 @@ int main() {
         // draw
         BeginDrawing();
         {
-            ClearBackground(BLACK);
+        
+
+            ClearBackground(GRAY);
+            BeginMode2D(camera);
+                    DrawTexture(texture , 0, 0, Color{0xFF,0xFF,0xFF,0xFF});
+            EndMode2D();
+
+            
             if (GuiButton(Rectangle{0,0, 50, 20}, "Water")) {
                 cursor_mode = CUR_WATER;
             } else if(GuiButton(Rectangle{60, 0, 50, 20}, "Sand")) {
@@ -663,8 +765,8 @@ int main() {
             }
 
             DrawFPS(10, 10);
-            DrawTexture(texture , 0, 0, Color{0xFF,0xFF,0xFF,0xFF});
-      
+
+  
         }
         EndDrawing();
     }
