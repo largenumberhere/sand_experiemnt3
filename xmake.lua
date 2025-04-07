@@ -13,7 +13,7 @@ target("main")
     
 target("main2")
     set_kind("binary")
-    add_files("src/main2.cpp")
+    add_files("src/main2.cpp", "src/cells.cpp", "src/cellhandle.cpp", "src/celliter.cpp", "src/xy.cpp")
     add_packages("raylib")
     add_packages("raygui")
     set_languages("c11", "c++23")
