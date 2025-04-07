@@ -64,7 +64,60 @@ class XY {
         }
 };
 
+
+enum  IterDirection : uint8_t {
+    DIRECTION_ITER_ROWS,
+};
 class CellHandle;
+
+struct CellIter {
+    // tag dispatch mechanism from before C++17  
+    using iterator_category = std::bidirectional_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = CellHandle;
+    using pointer = CellHandle;
+    using refrence = CellHandle;
+
+    CellIter(pointer start, IterDirection direction) : _ptr(start), _direction(direction) {} 
+
+    // derefrence
+    refrence operator *() const {return _ptr; }
+    pointer operator ->() {return _ptr;}
+
+    // prefix operators
+    CellIter& operator ++() {
+        if (_direction == DIRECTION_ITER_ROWS) {
+            _ptr.incrementRowWise();
+        } else {
+            TODO();
+        }
+        return *this;
+    }
+
+    CellIter& operator --() {
+        if (_direction == DIRECTION_ITER_ROWS) {
+            _ptr.decrementRowWise();
+        } else {
+            TODO();
+        }
+        _ptr.decrementRowWise(); 
+        return *this;
+    }
+
+    // postfix operators
+    CellIter operator++(int) {CellIter tmp = *this; ++(*this); return tmp;}
+    CellIter operator--(int) {CellIter tmp = *this; --(*this); return tmp;}
+
+    // equality
+    friend bool operator == (const CellIter& a, const CellIter& b) {return a._ptr.equals(b._ptr);}
+    friend bool operator != (const CellIter& a, const CellIter& b) {return !(a._ptr.equals(b._ptr));}
+
+
+    private: 
+        pointer _ptr;
+        IterDirection _direction;
+};
+
 class Cells {
     private:
         std::vector<bool> cellsHaveSandPhysics = std::vector<bool>();
@@ -83,7 +136,7 @@ class Cells {
             return true;
         }
 
-        uint64_t xy_to_pos(XY coords) {
+        uint64_t checked_xy_to_pos(XY coords) {
             if (!rangeCheck(coords.x,coords.y)) {
                 TODO();
             }
@@ -97,6 +150,7 @@ class Cells {
 
     public:
         CellHandle getCell(uint64_t x, uint64_t y);
+        
 
         Cells() {
             cellsHaveSandPhysics = std::vector<bool>(GRID_WIDTH * GRID_HEIGHT);
@@ -135,14 +189,15 @@ class Cells {
 
 };
 
+
 class CellHandle {
     private:
-        uint64_t index;
+        int64_t index;
         Cells* parent;
 
         CellHandle() {}
 
-        XY pos_to_xy(uint64_t pos) {
+        XY pos_to_xy(int64_t pos) {
             uint64_t x = (pos % COLUMNS_X);
             uint64_t y = (pos / COLUMNS_X);
 
@@ -151,6 +206,40 @@ class CellHandle {
 
 
     public:
+        // copy-asign constructor
+        CellHandle& operator=(const CellHandle& rhs) {
+            this->index = rhs.index;
+            this->parent = rhs.parent; 
+        }
+
+        // copy constructor
+        CellHandle(const CellHandle& rhs) {
+            index = rhs.index;
+            parent = rhs.parent;
+        }
+
+        // copy 
+        CellHandle clone() {
+            return CellHandle(*this);
+        }
+
+        // equality
+        inline bool operator==(const CellHandle& rhs) {
+            return rhs.index == this->index;
+        }
+
+        constexpr inline bool equals(const CellHandle& rhs) {
+            return *this == rhs;
+        }
+
+        inline void incrementRowWise() {
+            this->index +=1;
+        }
+
+        inline void decrementRowWise() {
+            this->index -=1;
+        }
+
         static inline CellHandle create(uint64_t cell_position, Cells *all_cells) {
             CellHandle handle;
             handle.index = cell_position;
@@ -216,13 +305,19 @@ class CellHandle {
         }
 
         inline bool hasDown() {
-            TODO();
-            return false;
+            XY pos = pos_to_xy(index).addParts(XY(0, 1));
+            return parent->isInRange(pos.x, pos.y);
         }
         
         inline CellHandle getDown() {
-            TODO();
-            return CellHandle {};
+            if (BOUNDS_ASSERTIONS) {
+                if (!hasDown()) {
+                    TODO();
+                }
+            }
+
+            XY pos = pos_to_xy(index).addParts(XY(0, 1));
+            return parent->getCell(pos.x, pos.y);
         }
 
         inline bool hasRightUp() {
@@ -267,10 +362,13 @@ class CellHandle {
 };
 
 CellHandle Cells::getCell(uint64_t x, uint64_t y) {
-    uint64_t pos = this->xy_to_pos(XY(x,y));
+    uint64_t pos = this->checked_xy_to_pos(XY(x,y));
     CellHandle handle = CellHandle::create(pos, this);
 
     return handle;
+}
+
+CellHandle Cells::rowsBegin() {
 
 }
 
@@ -293,6 +391,8 @@ static Texture2D genTexture2d() {
 
 
 static void updateTexture(Texture2D* texture, std::vector<Color>* backing, Cells* grid) {
+    
+
     // for (int x = 0; x < COLUMNS_X; x++) {
     //     for (int y = 0; y < ROWS_Y; y++) {
     //         int* backing_ptr = NULL;
