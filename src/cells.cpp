@@ -27,7 +27,7 @@ Cells::Cells() {
     cellsArePopulated = std::vector<bool>(GRID_WIDTH * GRID_HEIGHT);
 }
 
-inline bool Cells::isInRange(uint64_t x, uint64_t y) {
+bool Cells::isInRange(uint64_t x, uint64_t y) {
     if (y >= ROWS_Y || x >= COLUMNS_X || y < 0 || x < 0) {
         return false;
     }

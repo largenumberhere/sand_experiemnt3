@@ -16,7 +16,7 @@ class Cells {
         Cells();
         
         CellHandle getCell(uint64_t x, uint64_t y);
-        inline static bool isInRange(uint64_t x, uint64_t y);
+        static bool isInRange(uint64_t x, uint64_t y);
         bool cellHasSandPhysics(uint64_t cell_index);
         bool cellIsPopulated(uint64_t cell_index);
 };

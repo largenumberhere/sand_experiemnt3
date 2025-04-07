@@ -22,12 +22,12 @@ class CellHandle {
         // copy 
         CellHandle clone();
         // equality
-        inline bool operator==(const CellHandle& rhs);
+        inline bool operator==(const CellHandle& rhs) const;
 
-        constexpr inline bool equals(const CellHandle& rhs);
+        const inline bool equals(const CellHandle& rhs) const;
 
-        inline void incrementRowWise();
-        inline void decrementRowWise();
+        void incrementRowWise();
+        void decrementRowWise();
 
         static inline CellHandle create(uint64_t cell_position, Cells *all_cells);
         inline bool isPopulated();

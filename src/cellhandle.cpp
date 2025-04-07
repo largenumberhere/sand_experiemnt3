@@ -14,6 +14,8 @@ XY CellHandle::pos_to_xy(int64_t pos) {
 CellHandle& CellHandle::operator=(const CellHandle& rhs) {
     this->index = rhs.index;
     this->parent = rhs.parent; 
+
+    return *this;
 }
 
 // copy constructor
@@ -28,19 +30,19 @@ CellHandle CellHandle::clone() {
 }
 
 // equality
-inline bool CellHandle::operator==(const CellHandle& rhs) {
+inline bool CellHandle::operator==(const CellHandle& rhs) const {
     return rhs.index == this->index;
 }
 
-constexpr inline bool CellHandle::equals(const CellHandle& rhs) {
+const inline bool CellHandle::equals(const CellHandle& rhs) const {
     return *this == rhs;
 }
 
-inline void CellHandle::incrementRowWise() {
+void CellHandle::incrementRowWise() {
     this->index +=1;
 }
 
-inline void CellHandle::decrementRowWise() {
+void CellHandle::decrementRowWise() {
     this->index -=1;
 }
 
